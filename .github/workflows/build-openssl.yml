@@ -13,7 +13,12 @@ jobs:
       - name: Get latest version number
         id: set-version
         run: |
-          version=$(curl -s https://www.openssl.org/source/ | grep -oP 'openssl-\K[0-9]+\.[0-9]+\.[0-9]+[a-z]?(?=\.tar\.gz)' | sort -V | tail -1)
+          version=$(git ls-remote --tags https://github.com/openssl/openssl.git \
+          | awk -F/ '{print $3}' \
+          | grep -E '^openssl-[0-9]+\.[0-9]+\.[0-9]+[a-z]?$' \
+          | sed 's/openssl-//' \
+          | sort -V \
+          | tail -1)
           echo "version=$version"
           echo "version=$version" >> $GITHUB_OUTPUT
 
@@ -31,16 +36,13 @@ jobs:
 
       - uses: ilammy/setup-nasm@v1
 
-      - name: Download OpenSSL ${{ needs.get-latest-version.outputs.version }}
+      - name: Clone OpenSSL source
         run: |
-          curl -L https://www.openssl.org/source/openssl-${{ needs.get-latest-version.outputs.version }}.tar.gz -o openssl.tar.gz
-          tar -xzf openssl.tar.gz
-          dir=$(tar -tf openssl.tar.gz | head -1 | cut -f1 -d"/")
-          echo "OPENSSL_DIR=$dir" >> $GITHUB_ENV
+          git clone --branch openssl-${{ needs.get-latest-version.outputs.version }} --depth 1 https://github.com/openssl/openssl.git
 
       - name: Build OpenSSL
         run: |
-          cd $env:OPENSSL_DIR
+          cd openssl
           perl Configure VC-WIN64A
           nmake
 
