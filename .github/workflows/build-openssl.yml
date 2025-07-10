@@ -9,6 +9,10 @@ on:
       - '**'
   workflow_dispatch:
 
+
+permissions:
+  contents: write  # Grants write access to the repository contents
+
 jobs:
   prepare-source:
     name: Clone OpenSSL Source
