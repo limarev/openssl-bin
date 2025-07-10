@@ -40,11 +40,21 @@ jobs:
         run: |
           git clone --branch openssl-${{ needs.get-latest-version.outputs.version }} --depth 1 https://github.com/openssl/openssl.git
 
+      - name: List Visual Studio
+        run: |
+          dir "C:\Program Files (x86)\"
+          dir "C:\Program Files (x86)\Microsoft Visual Studio\"
+          dir "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\"
+        shell: cmd
+
       - name: Build OpenSSL
         run: |
           cd openssl
           perl Configure VC-WIN64A
+          call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
           nmake
+        shell: cmd
+
 
       - name: Archive built Windows artifacts
         run: |
