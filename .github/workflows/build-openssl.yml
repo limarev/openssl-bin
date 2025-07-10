@@ -10,31 +10,45 @@ on:
   workflow_dispatch:
 
 jobs:
-  get-latest-version:
-    name: Get Latest OpenSSL Version
-    runs-on: ubuntu-latest
+  prepare-source:
+    name: Clone OpenSSL Source
+    runs-on: ubuntu-24.04
     outputs:
-      version: ${{ steps.set-version.outputs.version }}
+      version: ${{ steps.get-version.outputs.version }}
     steps:
-      - name: Get latest version number
-        id: set-version
+      - name: Get latest version from Git tags
+        id: get-version
         run: |
           version=$(git ls-remote --tags https://github.com/openssl/openssl.git \
-          | awk -F/ '{print $3}' \
-          | grep -E '^openssl-[0-9]+\.[0-9]+\.[0-9]+[a-z]?$' \
-          | sed 's/openssl-//' \
-          | sort -V \
-          | tail -1)
-          echo "version=$version"
+            | awk -F/ '{print $3}' \
+            | grep -E '^openssl-[0-9]+\\.[0-9]+\\.[0-9]+[a-z]?$' \
+            | sed 's/openssl-//' \
+            | sort -V \
+            | tail -1)
+
           echo "version=$version" >> $GITHUB_OUTPUT
+
+      - name: Clone OpenSSL
+        run: |
+          git clone --branch openssl-${{ steps.get-version.outputs.version }} --depth 1 https://github.com/openssl/openssl.git
+
+      - name: Upload source as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: openssl-source
+          path: openssl/
 
   build-windows:
     name: Build OpenSSL for Windows
-    needs: get-latest-version
+    needs: prepare-source
     runs-on: windows-2025
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Download OpenSSL source
+        uses: actions/download-artifact@v4
+        with:
+          name: openssl-source
+          path: openssl
 
       - uses: shogo82148/actions-setup-perl@v1
         with:
@@ -42,28 +56,91 @@ jobs:
 
       - uses: ilammy/setup-nasm@v1
 
-      - name: Clone OpenSSL source
-        run: |
-          git clone --branch openssl-${{ needs.get-latest-version.outputs.version }} --depth 1 https://github.com/openssl/openssl.git
-
-      - name: List Visual Studio
-        run: |
-          dir "C:\Program Files (x86)\"
-          dir "C:\Program Files (x86)\Microsoft Visual Studio\"
-          for /f "tokens=*" %%i in ('"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath') do set InstallDir=%%i
-          dir "%InstallDir%\VC\Auxiliary\Build\"
-        shell: cmd
-
       - name: Build OpenSSL
         run: |
-          for /f "tokens=*" %%i in ('"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath') do set InstallDir=%%i
-          call "%InstallDir%\VC\Auxiliary\Build\vcvars64.bat"
+          for /f "tokens=*" %%i in ('"C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath') do set InstallDir=%%i
+
+          call "%InstallDir%\\VC\\Auxiliary\\Build\\vcvars64.bat"
           cd openssl
           perl Configure VC-WIN64A
           nmake
         shell: cmd
 
-      - name: Archive built Windows artifacts
+      - name: Archive Windows build
         run: |
-          Compress-Archive -Path $env:OPENSSL_DIR\* -DestinationPath openssl-windows.zip
+          Compress-Archive -Path openssl\* -DestinationPath openssl-windows-${{ needs.prepare-source.outputs.version }}.zip
 
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: openssl-windows-${{ needs.prepare-source.outputs.version }}
+          path: openssl-windows-${{ needs.prepare-source.outputs.version }}.zip
+
+  build-ios:
+    name: Build OpenSSL for iOS
+    needs: prepare-source
+    runs-on: macos-14
+
+    steps:
+      - name: Download OpenSSL source
+        uses: actions/download-artifact@v4
+        with:
+          name: openssl-source
+          path: openssl
+
+      - name: Install dependencies
+        run: |
+          brew install perl
+
+      - name: Build OpenSSL
+        run: |
+          cd openssl
+          ./Configure ios64-cross
+          make
+
+      - name: Archive iOS build
+        run: |
+          zip -r openssl-ios-${{ needs.prepare-source.outputs.version }}.zip openssl
+
+      - name: Upload iOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: openssl-ios-${{ needs.prepare-source.outputs.version }}
+          path: openssl-ios-${{ needs.prepare-source.outputs.version }}.zip
+
+  publish-release:
+    name: Publish Release
+    needs: [build-windows, build-ios, prepare-source]
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.prepare-source.outputs.version }}
+          name: OpenSSL v${{ needs.prepare-source.outputs.version }}
+          body: |
+            This release contains OpenSSL built for:
+            - Windows
+            - iOS
+
+            Built automatically from the latest OpenSSL sources (v${{ needs.prepare-source.outputs.version }}).
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload assets to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.prepare-source.outputs.version }}
+          files: |
+            artifacts/openssl-windows-${{ needs.prepare-source.outputs.version }}/openssl-windows-${{ needs.prepare-source.outputs.version }}.zip
+            artifacts/openssl-ios-${{ needs.prepare-source.outputs.version }}/openssl-ios-${{ needs.prepare-source.outputs.version }}.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
