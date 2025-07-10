@@ -98,7 +98,7 @@ jobs:
           cd openssl
           chmod +x Configure
           ./Configure ios64-cross
-          make
+           make CC="xcrun --sdk iphoneos clang" CFLAGS="-isysroot $(xcrun --sdk iphoneos --show-sdk-path)"
 
       - name: Archive iOS build
         run: |
