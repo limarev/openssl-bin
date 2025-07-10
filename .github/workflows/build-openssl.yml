@@ -1,0 +1,50 @@
+name: Build and Release OpenSSL
+
+on:
+  workflow_dispatch:
+
+jobs:
+  get-latest-version:
+    name: Get Latest OpenSSL Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.set-version.outputs.version }}
+    steps:
+      - name: Get latest version number
+        id: set-version
+        run: |
+          version=$(curl -s https://www.openssl.org/source/ | grep -oP 'openssl-\K[0-9]+\.[0-9]+\.[0-9]+[a-z]?(?=\.tar\.gz)' | sort -V | tail -1)
+          echo "version=$version"
+          echo "version=$version" >> $GITHUB_OUTPUT
+
+  build-windows:
+    name: Build OpenSSL for Windows
+    needs: get-latest-version
+    runs-on: windows-2025
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shogo82148/actions-setup-perl@v1
+        with:
+          perl-version: '5.38'
+
+      - uses: ilammy/setup-nasm@v1
+
+      - name: Download OpenSSL ${{ needs.get-latest-version.outputs.version }}
+        run: |
+          curl -L https://www.openssl.org/source/openssl-${{ needs.get-latest-version.outputs.version }}.tar.gz -o openssl.tar.gz
+          tar -xzf openssl.tar.gz
+          dir=$(tar -tf openssl.tar.gz | head -1 | cut -f1 -d"/")
+          echo "OPENSSL_DIR=$dir" >> $GITHUB_ENV
+
+      - name: Build OpenSSL
+        run: |
+          cd $env:OPENSSL_DIR
+          perl Configure VC-WIN64A
+          nmake
+
+      - name: Archive built Windows artifacts
+        run: |
+          Compress-Archive -Path $env:OPENSSL_DIR\* -DestinationPath openssl-windows.zip
+
