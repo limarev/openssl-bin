@@ -39,7 +39,7 @@ jobs:
   build-windows:
     name: Build OpenSSL for Windows
     needs: prepare-source
-    runs-on: windows-2025
+    runs-on: "windows-2025"
     steps:
       - name: Download OpenSSL source
         uses: actions/download-artifact@v4
