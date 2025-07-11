@@ -100,7 +100,7 @@ jobs:
         run: |
           INSTALL_DIR="$PWD/openssl-install"
           cd openssl
-          
+          chmod +x Configure
           ./Configure ios64-cross \
             --prefix="$INSTALL_DIR" \
             --openssldir="$INSTALL_DIR/ssl" \
