@@ -159,6 +159,7 @@ jobs:
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: openssl-${{ needs.prepare-source.outputs.version }}
           files: |
             artifacts/openssl-windows-${{ needs.prepare-source.outputs.version }}/openssl-windows-${{ needs.prepare-source.outputs.version }}.zip
             artifacts/openssl-ios-${{ needs.prepare-source.outputs.version }}/openssl-ios-${{ needs.prepare-source.outputs.version }}.zip
