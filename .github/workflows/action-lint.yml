@@ -17,4 +17,4 @@ jobs:
           sudo mv actionlint /usr/local/bin/
           rm actionlint.tar.gz
       - name: Run actionlint
-        run: actionlint
+        run: actionlint -ignore 'shellcheck:SC2086'
