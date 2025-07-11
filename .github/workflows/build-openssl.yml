@@ -7,7 +7,7 @@ on:
 jobs:
   prepare-source:
     name: Clone OpenSSL Source
-    runs-on: ubuntu-24.04
+    runs-on: "ubuntu-24.04"
     outputs:
       version: ${{ steps.get-version.outputs.version }}
     steps:
