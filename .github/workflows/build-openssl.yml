@@ -20,7 +20,7 @@ jobs:
           | sed 's/openssl-//' \
           | sort -V \
           | tail -1)
-          
+
           #TODO: delete it
           version="3.3.0"
           echo "Detected the latest OpenSSL version is $version"
@@ -36,11 +36,10 @@ jobs:
           name: openssl-source
           path: openssl/
 
-  build-windows:
+build-windows:
     name: Build OpenSSL for Windows
     needs: prepare-source
     runs-on: windows-2025
-
     steps:
       - name: Download OpenSSL source
         uses: actions/download-artifact@v4
@@ -55,18 +54,26 @@ jobs:
       - uses: ilammy/setup-nasm@v1
 
       - name: Build OpenSSL
-        run: |
-          for /f "tokens=*" %%i in ('"C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath') do set InstallDir=%%i
-
-          call "%InstallDir%\\VC\\Auxiliary\\Build\\vcvars64.bat"
-          cd openssl
-          perl Configure VC-WIN64A
-          nmake
         shell: cmd
+        run: |
+          set InstallDir=%CD%\openssl-install
+          
+          for /f "tokens=*" %%i in ('"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath') do set InstallDirVS=%%i
+          
+          call "%InstallDirVS%\VC\Auxiliary\Build\vcvars64.bat"
+          cd openssl
+          perl Configure VC-WIN64A ^
+            --prefix="%InstallDir%" ^
+            --openssldir="%InstallDir%\ssl" ^
+            no-shared ^
+            no-tests
+          
+          nmake
+          nmake install
 
       - name: Archive Windows build
         run: |
-          Compress-Archive -Path openssl\* -DestinationPath openssl-windows-${{ needs.prepare-source.outputs.version }}.zip
+          Compress-Archive -Path openssl-install\* -DestinationPath openssl-windows-${{ needs.prepare-source.outputs.version }}.zip
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
@@ -74,72 +81,86 @@ jobs:
           name: openssl-windows-${{ needs.prepare-source.outputs.version }}
           path: openssl-windows-${{ needs.prepare-source.outputs.version }}.zip
 
-  build-ios:
-    name: Build OpenSSL for iOS
-    needs: prepare-source
-    runs-on: macos-14
+build-ios:
+  name: Build OpenSSL for iOS
+  needs: prepare-source
+  runs-on: macos-14
+  steps:
+    - name: Download OpenSSL source
+      uses: actions/download-artifact@v4
+      with:
+        name: openssl-source
+        path: openssl
 
-    steps:
-      - name: Download OpenSSL source
-        uses: actions/download-artifact@v4
-        with:
-          name: openssl-source
-          path: openssl
+    - name: Install dependencies
+      run: |
+        brew install perl
 
-      - name: Install dependencies
-        run: |
-          brew install perl
+    - name: Build OpenSSL for iOS
+      run: |
+        INSTALL_DIR="$PWD/openssl-install"
+        cd openssl
+        
+        ./Configure ios64-cross \
+          --prefix="$INSTALL_DIR" \
+          --openssldir="$INSTALL_DIR/ssl" \
+          no-shared \
+          no-tests \
+          no-legacy \
+          no-asm
+        
+        make CC="xcrun --sdk iphoneos clang" \
+          CFLAGS="-fembed-bitcode -isysroot $(xcrun --sdk iphoneos --show-sdk-path) -arch arm64" \
+          CXXFLAGS="-fembed-bitcode -isysroot $(xcrun --sdk iphoneos --show-sdk-path) -arch arm64"
+        
+        make install
 
-      - name: Build OpenSSL
-        run: |
-          cd openssl
-          chmod +x Configure
-          ./Configure ios64-cross
-           make CC="xcrun --sdk iphoneos clang" CFLAGS="-isysroot $(xcrun --sdk iphoneos --show-sdk-path)"
+    - name: Archive iOS build
+      run: |
+        cd openssl-install
+        zip -r ../openssl-ios-${{ needs.prepare-source.outputs.version }}.zip .
 
-      - name: Archive iOS build
-        run: |
-          zip -r openssl-ios-${{ needs.prepare-source.outputs.version }}.zip openssl
+    - name: Upload iOS artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: openssl-ios-${{ needs.prepare-source.outputs.version }}
+        path: openssl-ios-${{ needs.prepare-source.outputs.version }}.zip
 
-      - name: Upload iOS artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: openssl-ios-${{ needs.prepare-source.outputs.version }}
-          path: openssl-ios-${{ needs.prepare-source.outputs.version }}.zip
+publish-release:
+  name: Publish Release
+  needs: [build-windows, build-ios, prepare-source]
+  runs-on: ubuntu-24.04
+  steps:
+    - uses: actions/checkout@v4
 
-  publish-release:
-    name: Publish Release
-    needs: [build-windows, build-ios, prepare-source]
-    runs-on: ubuntu-24.04
+    - name: Download artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
 
-    steps:
-      - uses: actions/checkout@v4
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: openssl-${{ needs.prepare-source.outputs.version }}
+        name: OpenSSL v${{ needs.prepare-source.outputs.version }}
+        body: |
+          Static OpenSSL builds for:
+          - Windows (VC-WIN64A)
+          - iOS (arm64)
+          
+          Configuration:
+          - Prefix: openssl-install/
+          - OpenSSL dir: ssl/
+          - no-shared
+          - no-tests
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: openssl-${{ needs.prepare-source.outputs.version }}
-          name: OpenSSL v${{ needs.prepare-source.outputs.version }}
-          body: |
-            This release contains OpenSSL built for:
-            - Windows
-            - iOS
-
-            Built automatically from the latest OpenSSL sources (v${{ needs.prepare-source.outputs.version }}).
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload assets to Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ needs.prepare-source.outputs.version }}
-          files: |
-            artifacts/openssl-windows-${{ needs.prepare-source.outputs.version }}/openssl-windows-${{ needs.prepare-source.outputs.version }}.zip
-            artifacts/openssl-ios-${{ needs.prepare-source.outputs.version }}/openssl-ios-${{ needs.prepare-source.outputs.version }}.zip
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Upload release assets
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          artifacts/openssl-windows-${{ needs.prepare-source.outputs.version }}/openssl-windows-${{ needs.prepare-source.outputs.version }}.zip
+          artifacts/openssl-ios-${{ needs.prepare-source.outputs.version }}/openssl-ios-${{ needs.prepare-source.outputs.version }}.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
