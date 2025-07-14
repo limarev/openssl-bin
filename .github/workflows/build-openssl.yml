@@ -69,6 +69,8 @@ jobs:
             --openssldir="%InstallDir%\ssl" ^
             no-shared ^
             no-tests
+          # use all cores
+          set CL=/MP
           nmake
           nmake install
 
@@ -110,13 +112,9 @@ jobs:
             no-tests \
             no-legacy \
             no-asm
-          
-          make CC="xcrun --sdk iphoneos clang" \
-            CFLAGS="-fembed-bitcode -isysroot $(xcrun --sdk iphoneos --show-sdk-path) -arch arm64" \
-            CXXFLAGS="-fembed-bitcode -isysroot $(xcrun --sdk iphoneos --show-sdk-path) -arch arm64"
-          
-          make install
 
+          make -j$(sysctl -n hw.ncpu)
+          make install_sw
       - name: Archive iOS build
         run: |
           cd openssl-install
@@ -136,11 +134,8 @@ jobs:
             no-legacy \
             no-asm
           
-          make CC="xcrun --sdk iphoneos clang" \
-            CFLAGS="-fembed-bitcode -isysroot $(xcrun --sdk iphoneos --show-sdk-path) -arch arm64" \
-            CXXFLAGS="-fembed-bitcode -isysroot $(xcrun --sdk iphoneos --show-sdk-path) -arch arm64"
-          
-          make install
+          make -j$(sysctl -n hw.ncpu)
+          make install_sw
 
       - name: Archive iOS build
         run: |
