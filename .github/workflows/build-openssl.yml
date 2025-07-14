@@ -68,6 +68,7 @@ jobs:
             --prefix="%InstallDir%" ^
             --openssldir="%InstallDir%\ssl" ^
             no-shared ^
+            no-legacy ^
             no-tests
           # use all cores
           set CL=/MP
@@ -109,6 +110,7 @@ jobs:
             --prefix="$INSTALL_DIR" \
             --openssldir="$INSTALL_DIR/ssl" \
             no-shared \
+            no-legacy \
             no-tests
 
           make CC="xcrun --sdk iphoneos clang" \
@@ -152,6 +154,7 @@ jobs:
             --prefix="$INSTALL_DIR" \
             --openssldir="$INSTALL_DIR/ssl" \
             no-shared \
+            no-legacy \
             no-tests
           
           make -j$(sysctl -n hw.ncpu) \
