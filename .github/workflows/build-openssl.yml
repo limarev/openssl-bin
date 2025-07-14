@@ -109,8 +109,7 @@ jobs:
             --prefix="$INSTALL_DIR" \
             --openssldir="$INSTALL_DIR/ssl" \
             no-shared \
-            no-tests \
-            no-legacy
+            no-tests
 
           make CC="xcrun --sdk iphoneos clang" \
             CFLAGS="-fembed-bitcode -isysroot $(xcrun --sdk iphoneos --show-sdk-path) -arch arm64" \
@@ -153,13 +152,12 @@ jobs:
             --prefix="$INSTALL_DIR" \
             --openssldir="$INSTALL_DIR/ssl" \
             no-shared \
-            no-tests \
-            no-legacy
+            no-tests
           
           make -j$(sysctl -n hw.ncpu) \
             CC="xcrun --sdk iphonesimulator clang" \
-            CFLAGS="-arch x86_64 -mios-simulator-version-min=11.0" \
-            CXXFLAGS="-arch x86_64 -mios-simulator-version-min=11.0"
+            CFLAGS="-arch x86_64" \
+            CXXFLAGS="-arch x86_64"
           
           make install
 
