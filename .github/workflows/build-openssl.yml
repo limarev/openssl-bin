@@ -98,6 +98,30 @@ jobs:
       - name: Install dependencies
         run: |
           brew install perl
+      
+      # Build for iOS Simulator (x86_64)
+      - name: Build OpenSSL for iOS x86_64 iossimulator
+        run: |
+          INSTALL_DIR="$PWD/openssl-install"
+          cd openssl
+          chmod +x Configure
+          ./Configure iossimulator-x86_64-xcrun \
+            --prefix="$INSTALL_DIR" \
+            --openssldir="$INSTALL_DIR/ssl" \
+            no-shared \
+            no-tests \
+            no-legacy
+          
+          make CC="xcrun --sdk iphoneos clang" \
+            CFLAGS="-fembed-bitcode -isysroot $(xcrun --sdk iphoneos --show-sdk-path) -arch x86_64" \
+            CXXFLAGS="-fembed-bitcode -isysroot $(xcrun --sdk iphoneos --show-sdk-path) -arch x86_64"
+          
+          make install
+
+      - name: Archive iOS x86_64 build
+        run: |
+          cd openssl-install
+          zip -r ../openssl-ios-x86_64-${{ needs.prepare-source.outputs.version }}.zip .
 
       # Build for iOS Device (arm64)
       - name: Build OpenSSL for iOS arm64
@@ -110,38 +134,18 @@ jobs:
             --openssldir="$INSTALL_DIR/ssl" \
             no-shared \
             no-tests \
-            no-legacy \
-            no-asm
+            no-legacy
 
-          make -j$(sysctl -n hw.ncpu)
-          make install_sw
-      - name: Archive iOS build
+          make CC="xcrun --sdk iphoneos clang" \
+            CFLAGS="-fembed-bitcode -isysroot $(xcrun --sdk iphoneos --show-sdk-path) -arch arm64" \
+            CXXFLAGS="-fembed-bitcode -isysroot $(xcrun --sdk iphoneos --show-sdk-path) -arch arm64"
+          
+          make install
+      - name: Archive iOS arm64 build
         run: |
           cd openssl-install
           zip -r ../openssl-ios-arm64-${{ needs.prepare-source.outputs.version }}.zip .
       
-      # Build for iOS Simulator (x86_64)
-      - name: Build OpenSSL for iOS x86_64 iossimulator
-        run: |
-          INSTALL_DIR="$PWD/openssl-install"
-          cd openssl
-          chmod +x Configure
-          ./Configure iossimulator-xcrun \
-            --prefix="$INSTALL_DIR" \
-            --openssldir="$INSTALL_DIR/ssl" \
-            no-shared \
-            no-tests \
-            no-legacy \
-            no-asm
-          
-          make -j$(sysctl -n hw.ncpu)
-          make install_sw
-
-      - name: Archive iOS build
-        run: |
-          cd openssl-install
-          zip -r ../openssl-ios-x86_64-${{ needs.prepare-source.outputs.version }}.zip .
-
       # Upload both artifacts
       - name: Upload arm64 artifact
         uses: actions/upload-artifact@v4
