@@ -97,7 +97,8 @@ jobs:
         run: |
           brew install perl
 
-      - name: Build OpenSSL for iOS
+      # Build for iOS Device (arm64)
+      - name: Build OpenSSL for iOS arm64
         run: |
           INSTALL_DIR="$PWD/openssl-install"
           cd openssl
@@ -119,13 +120,45 @@ jobs:
       - name: Archive iOS build
         run: |
           cd openssl-install
-          zip -r ../openssl-ios-${{ needs.prepare-source.outputs.version }}.zip .
+          zip -r ../openssl-ios-arm64-${{ needs.prepare-source.outputs.version }}.zip .
+      
+      # Build for iOS Simulator (x86_64)
+      - name: Build OpenSSL for iOS x86_64 iossimulator
+        run: |
+          INSTALL_DIR="$PWD/openssl-install"
+          cd openssl
+          chmod +x Configure
+          ./Configure iossimulator-xcrun \
+            --prefix="$INSTALL_DIR" \
+            --openssldir="$INSTALL_DIR/ssl" \
+            no-shared \
+            no-tests \
+            no-legacy \
+            no-asm
+          
+          make CC="xcrun --sdk iphoneos clang" \
+            CFLAGS="-fembed-bitcode -isysroot $(xcrun --sdk iphoneos --show-sdk-path) -arch arm64" \
+            CXXFLAGS="-fembed-bitcode -isysroot $(xcrun --sdk iphoneos --show-sdk-path) -arch arm64"
+          
+          make install
 
-      - name: Upload iOS artifact
+      - name: Archive iOS build
+        run: |
+          cd openssl-install
+          zip -r ../openssl-ios-x86_64-${{ needs.prepare-source.outputs.version }}.zip .
+
+      # Upload both artifacts
+      - name: Upload arm64 artifact
         uses: actions/upload-artifact@v4
         with:
-          name: openssl-ios-${{ needs.prepare-source.outputs.version }}
-          path: openssl-ios-${{ needs.prepare-source.outputs.version }}.zip
+          name: openssl-ios-arm64-${{ needs.prepare-source.outputs.version }}
+          path: openssl-ios-arm64-${{ needs.prepare-source.outputs.version }}.zip
+  
+      - name: Upload x86_64 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: openssl-ios-x86_64-${{ needs.prepare-source.outputs.version }}
+          path: openssl-ios-x86_64-${{ needs.prepare-source.outputs.version }}.zip
 
   publish-release:
     name: Publish Release
@@ -163,6 +196,7 @@ jobs:
           tag_name: openssl-${{ needs.prepare-source.outputs.version }}
           files: |
             artifacts/openssl-windows-${{ needs.prepare-source.outputs.version }}/openssl-windows-${{ needs.prepare-source.outputs.version }}.zip
-            artifacts/openssl-ios-${{ needs.prepare-source.outputs.version }}/openssl-ios-${{ needs.prepare-source.outputs.version }}.zip
+            artifacts/openssl-ios-arm64-${{ needs.prepare-source.outputs.version }}/openssl-ios-arm64-${{ needs.prepare-source.outputs.version }}.zip
+            artifacts/openssl-ios-x86_64-${{ needs.prepare-source.outputs.version }}/openssl-ios-x86_64-${{ needs.prepare-source.outputs.version }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
