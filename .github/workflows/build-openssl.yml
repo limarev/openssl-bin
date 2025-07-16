@@ -15,7 +15,7 @@ jobs:
     steps:
       - name: Clone OpenSSL
         run: |
-          git clone --branch openssl-${{ steps.get-version.outputs.version }} --depth 1 https://github.com/openssl/openssl.git
+          git clone --branch openssl-${{ github.event.inputs.version }} --depth 1 https://github.com/openssl/openssl.git
 
       - name: Upload source as artifact
         uses: actions/upload-artifact@v4
