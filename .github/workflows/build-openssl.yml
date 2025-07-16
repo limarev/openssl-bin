@@ -12,16 +12,7 @@ jobs:
   prepare-source:
     name: Clone OpenSSL Source
     runs-on: ubuntu-24.04
-    outputs:
-      version: ${{ steps.get-version.outputs.version }}
     steps:
-      - name: Get latest version from Git tags
-        id: get-version
-        run: |
-          version=${{ github.event.inputs.version }}
-          echo "Detected the latest OpenSSL version is $version"
-          echo "version=$version" >> $GITHUB_OUTPUT
-
       - name: Clone OpenSSL
         run: |
           git clone --branch openssl-${{ steps.get-version.outputs.version }} --depth 1 https://github.com/openssl/openssl.git
@@ -61,7 +52,6 @@ jobs:
           perl Configure VC-WIN64A ^
             --prefix="%InstallDir%" ^
             --openssldir="%InstallDir%\ssl" ^
-            no-shared ^
             no-legacy ^
             no-tests
           # use all cores
@@ -71,13 +61,13 @@ jobs:
 
       - name: Archive Windows build
         run: |
-          Compress-Archive -Path openssl-install\* -DestinationPath openssl-windows-${{ needs.prepare-source.outputs.version }}.zip
+          Compress-Archive -Path openssl-install\* -DestinationPath openssl-windows-${{ github.event.inputs.version }}.zip
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
-          name: openssl-windows-${{ needs.prepare-source.outputs.version }}
-          path: openssl-windows-${{ needs.prepare-source.outputs.version }}.zip
+          name: openssl-windows-${{ github.event.inputs.version }}
+          path: openssl-windows-${{ github.event.inputs.version }}.zip
 
   build-ios-arm64:
     name: Build OpenSSL for iOS arm64
@@ -103,7 +93,6 @@ jobs:
           ./Configure ios64-cross \
             --prefix="$INSTALL_DIR" \
             --openssldir="$INSTALL_DIR/ssl" \
-            no-shared \
             no-legacy \
             no-tests
 
@@ -115,14 +104,14 @@ jobs:
       - name: Archive iOS arm64 build
         run: |
           cd openssl-install
-          zip -r ../openssl-ios-arm64-${{ needs.prepare-source.outputs.version }}.zip .
+          zip -r ../openssl-ios-arm64-${{ github.event.inputs.version }}.zip .
       
       # Upload both artifacts
       - name: Upload arm64 artifact
         uses: actions/upload-artifact@v4
         with:
-          name: openssl-ios-arm64-${{ needs.prepare-source.outputs.version }}
-          path: openssl-ios-arm64-${{ needs.prepare-source.outputs.version }}.zip
+          name: openssl-ios-arm64-${{ github.event.inputs.version }}
+          path: openssl-ios-arm64-${{ github.event.inputs.version }}.zip
 
   build-ios-x86_64:
     name: Build OpenSSL for iOS x86_64
@@ -147,7 +136,6 @@ jobs:
           ./Configure iossimulator-x86_64-xcrun \
             --prefix="$INSTALL_DIR" \
             --openssldir="$INSTALL_DIR/ssl" \
-            no-shared \
             no-legacy \
             no-tests
           
@@ -161,13 +149,13 @@ jobs:
       - name: Archive iOS x86_64 build
         run: |
           cd openssl-install
-          zip -r ../openssl-ios-x86_64-${{ needs.prepare-source.outputs.version }}.zip .
+          zip -r ../openssl-ios-x86_64-${{ github.event.inputs.version }}.zip .
 
       - name: Upload x86_64 artifact
         uses: actions/upload-artifact@v4
         with:
-          name: openssl-ios-x86_64-${{ needs.prepare-source.outputs.version }}
-          path: openssl-ios-x86_64-${{ needs.prepare-source.outputs.version }}.zip
+          name: openssl-ios-x86_64-${{ github.event.inputs.version }}
+          path: openssl-ios-x86_64-${{ github.event.inputs.version }}.zip
 
           
   publish-release:
@@ -185,8 +173,8 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: openssl-${{ needs.prepare-source.outputs.version }}
-          name: OpenSSL v${{ needs.prepare-source.outputs.version }}
+          tag_name: openssl-${{ github.event.inputs.version }}
+          name: OpenSSL v${{ github.event.inputs.version }}
           body: |
             Static OpenSSL builds for:
             - Windows (VC-WIN64A)
@@ -195,7 +183,7 @@ jobs:
             Configuration:
             - Prefix: openssl-install/
             - OpenSSL dir: ssl/
-            - no-shared
+            - no-legacy
             - no-tests
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -203,10 +191,10 @@ jobs:
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: openssl-${{ needs.prepare-source.outputs.version }}
+          tag_name: openssl-${{ github.event.inputs.version }}
           files: |
-            artifacts/openssl-windows-${{ needs.prepare-source.outputs.version }}/openssl-windows-${{ needs.prepare-source.outputs.version }}.zip
-            artifacts/openssl-ios-arm64-${{ needs.prepare-source.outputs.version }}/openssl-ios-arm64-${{ needs.prepare-source.outputs.version }}.zip
-            artifacts/openssl-ios-x86_64-${{ needs.prepare-source.outputs.version }}/openssl-ios-x86_64-${{ needs.prepare-source.outputs.version }}.zip
+            artifacts/openssl-windows-${{ github.event.inputs.version }}/openssl-windows-${{ github.event.inputs.version }}.zip
+            artifacts/openssl-ios-arm64-${{ github.event.inputs.version }}}/openssl-ios-arm64-${{ github.event.inputs.version }}.zip
+            artifacts/openssl-ios-x86_64-${{ github.event.inputs.version }}/openssl-ios-x86_64-${{ github.event.inputs.version }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
