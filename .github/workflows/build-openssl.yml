@@ -49,7 +49,7 @@ jobs:
           
           call "%InstallDirVS%\VC\Auxiliary\Build\vcvars64.bat"
           cd openssl
-          perl Configure VC-WIN64A ^
+          perl Configure VC-WIN64A shared^
             --prefix="%InstallDir%" ^
             --openssldir="%InstallDir%\ssl" ^
             no-legacy ^
@@ -90,7 +90,7 @@ jobs:
           INSTALL_DIR="$PWD/openssl-install"
           cd openssl
           chmod +x Configure
-          ./Configure ios64-cross \
+          ./Configure ios64-cross shared \
             --prefix="$INSTALL_DIR" \
             --openssldir="$INSTALL_DIR/ssl" \
             no-legacy \
@@ -133,7 +133,7 @@ jobs:
           INSTALL_DIR="$PWD/openssl-install"
           cd openssl
           chmod +x Configure
-          ./Configure iossimulator-x86_64-xcrun \
+          ./Configure iossimulator-x86_64-xcrun shared \
             --prefix="$INSTALL_DIR" \
             --openssldir="$INSTALL_DIR/ssl" \
             no-legacy \
