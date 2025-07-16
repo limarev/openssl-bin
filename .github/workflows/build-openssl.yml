@@ -97,8 +97,8 @@ jobs:
             no-tests
 
           make CC="xcrun --sdk iphoneos clang" \
-            CFLAGS="-fembed-bitcode -isysroot $(xcrun --sdk iphoneos --show-sdk-path) -arch arm64" \
-            CXXFLAGS="-fembed-bitcode -isysroot $(xcrun --sdk iphoneos --show-sdk-path) -arch arm64"
+            CFLAGS="-isysroot $(xcrun --sdk iphoneos --show-sdk-path) -arch arm64" \
+            CXXFLAGS="-isysroot $(xcrun --sdk iphoneos --show-sdk-path) -arch arm64"
           
           make install
       - name: Archive iOS arm64 build
